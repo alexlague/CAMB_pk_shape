@@ -59,6 +59,8 @@
     integer, parameter :: halofit_casarini=7
     integer, parameter :: halofit_mead2016=5, halofit_halomodel=6, halofit_mead2015=8, halofit_mead2020=9
     integer, parameter :: halofit_mead2020_feedback=10
+    ! ALague Modif
+    integer, parameter :: halofit_pk_shape=11
     integer, parameter :: halofit_mead=halofit_mead2016 ! AM Kept for backwards compatability
     integer, parameter :: halofit_default=halofit_mead2020
 
@@ -70,6 +72,9 @@
         real(dl) :: HMcode_A_baryon=3.13_dl
         real(dl) :: HMcode_eta_baryon=0.603_dl
         real(dl) :: HMcode_logT_AGN=7.8_dl
+        !! ALague - These are the shape paramters for PK
+        real(dl) :: HMCode_alpha1=1.0_dl
+        real(dl) :: HMCode_alpha2=1.0_dl
         !!AM - Added these types for HMcode
         integer, private :: imead !!AM - added these for HMcode, need to be visible to all subroutines and functions
         real(dl), private :: om_m,om_v,fnu,omm0, acur, w_hf, wa_hf
@@ -101,6 +106,7 @@
     public halofit_default, halofit_original, halofit_bird, halofit_peacock, halofit_takahashi
     public halofit_mead2016, halofit_mead2015, halofit_mead2020, halofit_halomodel, halofit_casarini
     public halofit_mead2020_feedback
+    public halofit_pk_shape
     public halofit_mead ! AM for backwards compatability
 
     TYPE HM_cosmology
@@ -118,6 +124,9 @@
         REAL(dl) :: A_baryon=3.13
         REAL(dl) :: eta_baryon=0.603
         REAL(dl) :: logT_AGN=7.8
+        !ALague - Added the Pk shape paramters
+        REAL(dl) :: alpha1=1.0
+        REAL(dl) :: alpha2=1.0
     END TYPE HM_cosmology
 
     TYPE HM_tables
@@ -259,7 +268,13 @@
     IF(this%halofit_version == halofit_mead2020_feedback) THEN
         this%HMcode_logT_AGN = Ini%Read_Double('HMcode_logT_AGN', 7.8_dl)
     END IF
-
+    !IF(this%halofit_version == halofit_pk_shape) THEN
+    !    this%alpha1 = Ini%Read_Double('alpha1', 1.0_dl)
+    !END IF
+    !IF(this%halofit_version == halofit_pk_shape) THEN
+    !    this%alpha2 = Ini%Read_Double('alpha2', 1.0_dl)
+    !END IF 
+    
     end subroutine THalofit_ReadParams
 
     subroutine THalofit_GetNonLinRatios(this,State,CAMB_Pk)
@@ -285,7 +300,8 @@
                 this%halofit_version==halofit_halomodel .OR. &
                 this%halofit_version==halofit_mead2015 .OR. &
                 this%halofit_version==halofit_mead2020 .OR. &
-                this%halofit_version==halofit_mead2020_feedback) THEN
+                this%halofit_version==halofit_mead2020_feedback .OR. &
+                this%halofit_version==halofit_pk_shape) THEN
                 CALL this%HMcode(State,CAMB_Pk)
             ELSE
 
@@ -462,6 +478,15 @@
         pnl = plin + (pnl-plin)*(1+2*peacock_fudge**2)/(1+peacock_fudge**2)
     end if
 
+    ! ALague: introduce the k-dependent rescaling alphas
+    !if (this%halofit_version == halofit_pk_shape) then
+    !   if (rk>=0.05 .and. rk<0.5) then
+    !      pnl=pnl*alpha2
+    !   elseif (rk>=0.005 .and. rk<0.05) then
+    !      pnl=pnl*alpha1
+    !   end if
+    !end if
+    
     end subroutine halofit
 
 
@@ -569,7 +594,8 @@
     IF(this%halofit_version==halofit_mead2016) this%imead=1
     IF(this%halofit_version==halofit_mead2015) this%imead=2
     IF(this%halofit_version==halofit_mead2020) this%imead=3
-
+    IF(this%halofit_version==halofit_pk_shape) this%imead=1 ! ALague same as regular hmcode
+    
     HM_verbose = (FeedbackLevel>1)
 
     IF(HM_verbose) WRITE(*,*)
@@ -864,9 +890,17 @@
         p2h=this%p_2h(k,plin,lut,cosm)
     END IF
 
+    !ALague added alpha parameters here
     IF (this%imead==1 .OR. this%imead==2 .OR. this%imead==3) THEN
         a=this%alpha(lut)
         pfull=(p2h**a+p1h**a)**(1./a)
+        IF (this%halofit_version==halofit_pk_shape) THEN
+            IF(k>=0.005 .AND. k<0.05) THEN
+                pfull=pfull*cosm%alpha1
+            ELSEIF(k>=0.05 .AND. k<0.5) THEN
+                pfull=pfull*cosm%alpha2
+            END IF   
+        END IF   
     ELSE
         pfull=p2h+p1h
     END IF
@@ -1060,6 +1094,9 @@
         cosm%eta_baryon = this%HMcode_eta_baryon
     ELSE IF(this%halofit_version==halofit_mead2020_feedback) THEN
         cosm%logT_AGN = this%HMcode_logT_AGN
+    ELSE IF(this%halofit_version==halofit_pk_shape) THEN
+        cosm%alpha1 = this%HMCode_alpha1
+        cosm%alpha2 = this%HMCode_alpha2
     END IF
 
     !Write out cosmological parameters if necessary

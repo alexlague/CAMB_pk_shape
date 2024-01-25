@@ -20,6 +20,7 @@ halofit_mead2015 = 'mead2015'
 halofit_mead2016 = 'mead2016'
 halofit_mead2020 = 'mead2020'
 halofit_mead2020_feedback = 'mead2020_feedback'
+halofit_pk_shape = 'halofit_pk_shape'
 
 halofit_default = halofit_mead2020
 
@@ -33,7 +34,8 @@ halofit_version_names = {halofit_original: 1,
                          halofit_mead2015: 8,
                          halofit_mead2016: 5,
                          halofit_mead2020: 9,
-                         halofit_mead2020_feedback: 10}
+                         halofit_mead2020_feedback: 10,
+                         halofit_pk_shape: 11}
 
 
 @fortran_class
@@ -45,7 +47,9 @@ class Halofit(NonLinearModel):
         ("halofit_version", c_int, {"names": halofit_version_names}),
         ("HMCode_A_baryon", c_double, "HMcode parameter A_baryon"),
         ("HMCode_eta_baryon", c_double, "HMcode parameter eta_baryon"),
-        ("HMCode_logT_AGN", c_double, "HMcode parameter log10(T_AGN/K)")
+        ("HMCode_logT_AGN", c_double, "HMcode parameter log10(T_AGN/K)"),
+        ("HMCode_alpha1", c_double, "Pk shape parameter #1"),
+        ("HMCode_alpha2", c_double, "Pk shape parameter #2")
     ]
 
     _fortran_class_module_ = 'NonLinear'
@@ -55,7 +59,7 @@ class Halofit(NonLinearModel):
         return self.halofit_version
 
     def set_params(self, halofit_version=halofit_default, HMCode_A_baryon=3.13, HMCode_eta_baryon=0.603,
-                   HMCode_logT_AGN=7.8):
+                   HMCode_logT_AGN=7.8, HMCode_alpha1=1.0, HMCode_alpha2=1.0):
         """
         Set the halofit model for non-linear corrections.
 
@@ -80,7 +84,8 @@ class Halofit(NonLinearModel):
         self.HMCode_A_baryon = HMCode_A_baryon
         self.HMCode_eta_baryon = HMCode_eta_baryon
         self.HMCode_logT_AGN = HMCode_logT_AGN
-
+        self.HMCode_alpha1 = HMCode_alpha1
+        self.HMCode_alpha2 = HMCode_alpha2
 
 @fortran_class
 class SecondOrderPK(NonLinearModel):
